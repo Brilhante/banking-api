@@ -1,96 +1,109 @@
 import { NextFunction, Request, Response } from "express";
-import { prisma } from "../prisma";
+import { CheckingAccountService } from "../services/CheckingAccountService";
+import { handleError } from "../Utils";
+
 
 class CheckingAccountController {
 
-    async create(req: Request, res: Response) {
+    private checkingAccountService:  CheckingAccountService;
+
+    constructor(){
+        this.checkingAccountService = new CheckingAccountService();
+    }
+
+    created = async (req: Request, res: Response) => {
         try {
-            const { name, email, number } = req.body;
-            const checkingAccount = await prisma.checkingAccount.create({
-                data: {
-                    name,
-                    email,
-                    number
-                }
-            });
+            const { name, email, number } = req.body
+            const validation = this.isValidNameAndEmailAndNumber(name, email, number);
+
+            if (!validation) {
+                return res.status(400).json({msg: "Name, email and number are required"});
+            }
+
+            const checkingAccount = await this.checkingAccountService.create(name, email, number);
+            
             return res.status(201).json(checkingAccount);
         } catch (error) {
-            console.log(error);
-            return res.status(500).json({ error: error });
+            handleError(res, error, "Error creating checkingAccount");
         }
     }
 
-    async update(req: Request, res: Response) {
+    update = async (req: Request, res: Response) => {
         try {
             const id = req.params.id;
-            const { name, email, number } = req.body;
-            const checkingAccount = await prisma.checkingAccount.update({
-                where: {id},
-                data: {
-                    name,
-                    email,
-                    number
-                }
-            });
+            const { name, email, number } = req.body
+            const validation = this.isValidNameAndEmailAndNumber(name, email, number);
+            if(!validation) {
+                return res.status(400).json({msg: "Name, email and number are required"});
+            }
+            const checkingAccount = await this.checkingAccountService.update(id, name, email, number);
+
             return res.status(200).json(checkingAccount);
         } catch (error) {
-            console.log(error);
-            return res.status(500).json({error: error});
+
         }
     }
 
-    async delete(req: Request, res: Response) {
+    delete = async (req: Request, res: Response) => {
         try {
             const id = req.params.id;
-            await prisma.checkingAccount.delete({
-                where: {id}
-            });
-            return res.status(204).json();
+            await this.checkingAccountService.delete(id);
+            return res.status(204).json({});
         } catch (error) {
-            console.log(error);
-            return res.status(500).json({ error: error });
+            handleError(res, error, "Error deleting checkingAccount");
         }
     }
 
-    async findAll(req:Request, res:Response) {
+    findAll(req: Request, res: Response) {
         try {
-            const checkingAccounts = await prisma.checkingAccount.findMany();
-            return res.status(200).json(checkingAccounts);
+            return res.status(200).json(this.checkingAccountService.getAll());
         } catch (error) {
-            console.log(error);
-            return res.status(500).json({ error: error });
+            handleError(res, error, "Error getting checkingAccounts");
         }
     }
 
-    async findById(req:Request, res:Response) {
+    findById = async (req: Request, res: Response) => {
         try {
             const id = req.params.id;
-            const checkingAccount = await prisma.checkingAccount.findUnique({
-                where: {id}
-            });
-            if(checkingAccount == null) {
-                return res.status(404).json({msg: "Not found."});
+            const checkingAccount = await this.checkingAccountService.getById(id);
+    
+            if(!checkingAccount) {
+                return res.status(404).json({error: "CheckingAccount not found."});
             }
             return res.status(200).json(checkingAccount);
+            
         } catch (error) {
-            console.log(error);
-            return res.status(500).json();
+            handleError(res, error, "Error getting checkingAccount");
         }
+    }
+
+    private isValidNameAndEmailAndNumber(name: any, email: any, number: any) {
+        if (typeof name !== "string" || name.trim().length === 0) {
+            return {isValid: false, msg: "Name is required"};
+        }
+
+        if(typeof email !== "string" || email.trim().length === 0) {
+            return {isValid: false, msg: "Email is required"};
+        }
+        if(typeof number !== "string" || number.trim().length === 0) {
+            return {isValid: false, msg: "Number is required"};
+        }
+
+        return {isValid: true}; 
     }
 
     async verifyIfExists(req: Request, res:Response, next:NextFunction) {
         try {
             const id = req.params.id;
-            const checkingAccount = await prisma.checkingAccount.findUnique({
-                where: {id}
-            });
-            if(checkingAccount == null) {
-                return res.status(404).json({msg: "Not found"});
+            const checkingAccount = await this.checkingAccountService.getById(id);
+
+            if(!checkingAccount) {
+                return res.status(404).json({error: "CheckingAccount not found."});
             }
+
             return next();
         } catch (error) {
-            console.log(error);
-            return res.status(500).json({ error: error });
+            handleError(res, error, "Error verify if exists checkingAccount");
         }
     }
 }
